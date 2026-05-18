@@ -17,13 +17,6 @@ import {
   limitToLast
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-import {
-  getStorage,
-  ref as storageReference,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyCN9hMpHMtMvELr8kBcYDbS7PcgPuOyIgU",
   authDomain: "vichat-ca7b7.firebaseapp.com",
@@ -35,13 +28,12 @@ const firebaseConfig = {
 
 const allowedEmails = new Set([
   "mavika884@gmail.com",
-  "eminemreozdile@gmail.com"
+  "eminemreozdilek@gmail.com"
 ]);
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const database = getDatabase(app);
-const storage = getStorage(app);
 
 const loginPage = document.querySelector("#login-page");
 const chatPage = document.querySelector("#chat-page");
@@ -141,7 +133,7 @@ async function sendTextMessage() {
     senderEmail: user.email,
     type: "text",
     text: text,
-    imageUrl: "",
+    imageData: "",
     createdAt: Date.now()
   });
 }
@@ -160,36 +152,28 @@ async function sendPhotoMessage(event) {
     return;
   }
 
-  const maximumFileSizeInBytes = 5 * 1024 * 1024;
+  const maximumOriginalFileSizeInBytes = 8 * 1024 * 1024;
 
-  if (file.size > maximumFileSizeInBytes) {
-    alert("Fotoğraf çok büyük. Maksimum 5 MB yükleyebilirsin.");
+  if (file.size > maximumOriginalFileSizeInBytes) {
+    alert("Fotoğraf çok büyük. En fazla 8 MB seçebilirsin.");
     photoInput.value = "";
     return;
   }
 
-  const safeFileName = createSafeFileName(file.name);
-  const photoReference = storageReference(
-    storage,
-    `vichat_photos/${user.uid}/${safeFileName}`
-  );
-
   try {
-    await uploadBytes(photoReference, file);
-
-    const imageUrl = await getDownloadURL(photoReference);
+    const compressedImageData = await compressImageToBase64(file);
 
     await push(messagesReference, {
       senderUid: user.uid,
       senderEmail: user.email,
       type: "image",
       text: "",
-      imageUrl: imageUrl,
+      imageData: compressedImageData,
       createdAt: Date.now()
     });
   } catch (error) {
     console.error(error);
-    alert("Fotoğraf yüklenemedi.");
+    alert("Fotoğraf gönderilemedi.");
   } finally {
     photoInput.value = "";
   }
@@ -199,7 +183,7 @@ function startMessagesListener(currentUser) {
   const latestMessagesQuery = query(
     messagesReference,
     orderByChild("createdAt"),
-    limitToLast(150)
+    limitToLast(60)
   );
 
   onChildAdded(latestMessagesQuery, function handleNewMessage(snapshot) {
@@ -229,7 +213,7 @@ function renderMessage(message, currentUserUid) {
 
   if (message.type === "image") {
     const imageElement = document.createElement("img");
-    imageElement.src = message.imageUrl;
+    imageElement.src = message.imageData;
     imageElement.alt = "Gönderilen fotoğraf";
     messageBubble.appendChild(imageElement);
   }
@@ -243,6 +227,71 @@ function renderMessage(message, currentUserUid) {
   messagesContainer.appendChild(messageRow);
 
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function compressImageToBase64(file) {
+  return new Promise(function createCompressedImage(resolve, reject) {
+    const reader = new FileReader();
+
+    reader.onload = function handleFileLoaded(event) {
+      const image = new Image();
+
+      image.onload = function handleImageLoaded() {
+        const maximumWidth = 900;
+        const maximumHeight = 900;
+
+        let width = image.width;
+        let height = image.height;
+
+        if (width > height && width > maximumWidth) {
+          height = Math.round((height * maximumWidth) / width);
+          width = maximumWidth;
+        }
+
+        if (height >= width && height > maximumHeight) {
+          width = Math.round((width * maximumHeight) / height);
+          height = maximumHeight;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, width, height);
+
+        const jpegQuality = 0.72;
+        const compressedBase64 = canvas.toDataURL("image/jpeg", jpegQuality);
+
+        const approximateSizeInBytes = calculateBase64SizeInBytes(compressedBase64);
+        const maximumCompressedSizeInBytes = 900 * 1024;
+
+        if (approximateSizeInBytes > maximumCompressedSizeInBytes) {
+          reject(new Error("Sıkıştırılmış fotoğraf hâlâ çok büyük."));
+          return;
+        }
+
+        resolve(compressedBase64);
+      };
+
+      image.onerror = function handleImageError() {
+        reject(new Error("Fotoğraf okunamadı."));
+      };
+
+      image.src = event.target.result;
+    };
+
+    reader.onerror = function handleReaderError() {
+      reject(new Error("Dosya okunamadı."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function calculateBase64SizeInBytes(base64Text) {
+  const base64Content = base64Text.split(",")[1] || "";
+  return Math.ceil((base64Content.length * 3) / 4);
 }
 
 function showLoginPage() {
@@ -266,13 +315,4 @@ function formatTime(timestamp) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(timestamp));
-}
-
-function createSafeFileName(originalFileName) {
-  const cleanedFileName = originalFileName
-    .toLowerCase()
-    .replaceAll(" ", "_")
-    .replace(/[^a-z0-9._-]/g, "");
-
-  return `${Date.now()}_${cleanedFileName}`;
 }
