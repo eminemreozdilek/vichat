@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Vichat</title>
+  <meta name="theme-color" content="#f9d5e5" />
 
   <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
   <main class="app-shell">
 
@@ -17,7 +17,7 @@
         <div class="brand-circle">Vi</div>
 
         <h1>Vichat</h1>
-        <p>Sadece ikiniz için küçük, özel bir sohbet alanı.</p>
+        <p>Sadece ikiniz için tatlı, küçük ve özel bir sohbet alanı.</p>
 
         <form id="login-form" class="login-form">
           <input
@@ -45,12 +45,15 @@
 
     <section id="chat-page" class="chat-page hidden">
       <header class="chat-header">
-        <div>
+        <div class="header-left">
           <h1>Vichat</h1>
           <p id="user-label">Bağlanıyor...</p>
         </div>
 
-        <button id="logout-button" class="secondary-button">Çıkış</button>
+        <div class="header-buttons">
+          <button id="notification-button" class="secondary-button">Bildirim Aç</button>
+          <button id="logout-button" class="secondary-button">Çıkış</button>
+        </div>
       </header>
 
       <div id="messages-container" class="messages-container"></div>

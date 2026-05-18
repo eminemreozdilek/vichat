@@ -11,25 +11,28 @@ import {
   getDatabase,
   ref as databaseReference,
   push,
-  onChildAdded,
+  onValue,
   query,
   orderByChild,
   limitToLast
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCN9hMpHMtMvELr8kBcYDbS7PcgPuOyIgU",
-  authDomain: "vichat-ca7b7.firebaseapp.com",
-  projectId: "vichat-ca7b7",
-  storageBucket: "vichat-ca7b7.firebasestorage.app",
-  messagingSenderId: "875788187635",
-  appId: "1:875788187635:web:fcc778c857eac74ea5c486"
+  apiKey: "BURAYA_FIREBASE_API_KEY_GELECEK",
+  authDomain: "BURAYA_FIREBASE_AUTH_DOMAIN_GELECEK",
+  databaseURL: "BURAYA_FIREBASE_DATABASE_URL_GELECEK",
+  projectId: "BURAYA_FIREBASE_PROJECT_ID_GELECEK",
+  storageBucket: "BURAYA_FIREBASE_STORAGE_BUCKET_GELECEK",
+  messagingSenderId: "BURAYA_FIREBASE_MESSAGING_SENDER_ID_GELECEK",
+  appId: "BURAYA_FIREBASE_APP_ID_GELECEK"
 };
 
-const allowedEmails = new Set([
-  "mavika884@gmail.com",
-  "eminemreozdilek@gmail.com"
-]);
+const allowedUsers = {
+  "mavika884@gmail.com": "Mavika",
+  "eminemreozdilek@gmail.com": "Emin"
+};
+
+const allowedEmails = new Set(Object.keys(allowedUsers));
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -45,6 +48,7 @@ const loginError = document.querySelector("#login-error");
 
 const userLabel = document.querySelector("#user-label");
 const logoutButton = document.querySelector("#logout-button");
+const notificationButton = document.querySelector("#notification-button");
 
 const messagesContainer = document.querySelector("#messages-container");
 const messageInput = document.querySelector("#message-input");
@@ -54,6 +58,10 @@ const photoInput = document.querySelector("#photo-input");
 const messagesReference = databaseReference(database, "rooms/vichat/messages");
 
 let isMessagesListenerStarted = false;
+let seenMessageKeys = new Set();
+let isInitialMessagesLoaded = false;
+let unreadMessageCount = 0;
+let currentSignedUser = null;
 
 loginForm.addEventListener("submit", async function handleLogin(event) {
   event.preventDefault();
@@ -82,6 +90,8 @@ logoutButton.addEventListener("click", async function handleLogout() {
   location.reload();
 });
 
+notificationButton.addEventListener("click", requestNotificationPermission);
+
 sendButton.addEventListener("click", sendTextMessage);
 
 messageInput.addEventListener("keydown", function handleMessageInputKeydown(event) {
@@ -91,6 +101,13 @@ messageInput.addEventListener("keydown", function handleMessageInputKeydown(even
 });
 
 photoInput.addEventListener("change", sendPhotoMessage);
+
+document.addEventListener("visibilitychange", function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    unreadMessageCount = 0;
+    updateDocumentTitle();
+  }
+});
 
 onAuthStateChanged(auth, async function handleAuthStateChanged(user) {
   if (!user) {
@@ -105,6 +122,7 @@ onAuthStateChanged(auth, async function handleAuthStateChanged(user) {
     return;
   }
 
+  currentSignedUser = user;
   showChatPage(user);
 
   if (!isMessagesListenerStarted) {
@@ -131,6 +149,7 @@ async function sendTextMessage() {
   await push(messagesReference, {
     senderUid: user.uid,
     senderEmail: user.email,
+    senderName: getDisplayNameFromEmail(user.email),
     type: "text",
     text: text,
     imageData: "",
@@ -166,6 +185,7 @@ async function sendPhotoMessage(event) {
     await push(messagesReference, {
       senderUid: user.uid,
       senderEmail: user.email,
+      senderName: getDisplayNameFromEmail(user.email),
       type: "image",
       text: "",
       imageData: compressedImageData,
@@ -183,12 +203,45 @@ function startMessagesListener(currentUser) {
   const latestMessagesQuery = query(
     messagesReference,
     orderByChild("createdAt"),
-    limitToLast(60)
+    limitToLast(200)
   );
 
-  onChildAdded(latestMessagesQuery, function handleNewMessage(snapshot) {
-    const message = snapshot.val();
-    renderMessage(message, currentUser.uid);
+  onValue(latestMessagesQuery, function handleMessagesSnapshot(snapshot) {
+    const messages = [];
+
+    snapshot.forEach(function collectMessage(childSnapshot) {
+      messages.push({
+        key: childSnapshot.key,
+        ...childSnapshot.val()
+      });
+    });
+
+    messages.sort(function sortByTime(firstMessage, secondMessage) {
+      return (firstMessage.createdAt || 0) - (secondMessage.createdAt || 0);
+    });
+
+    messagesContainer.innerHTML = "";
+
+    for (const message of messages) {
+      renderMessage(message, currentUser.uid);
+    }
+
+    if (isInitialMessagesLoaded) {
+      for (const message of messages) {
+        const isNewMessage = !seenMessageKeys.has(message.key);
+        const isFromOtherPerson = message.senderUid !== currentUser.uid;
+
+        if (isNewMessage && isFromOtherPerson) {
+          handleIncomingMessageNotification(message);
+        }
+      }
+    }
+
+    seenMessageKeys = new Set(messages.map(function mapMessage(message) {
+      return message.key;
+    }));
+
+    isInitialMessagesLoaded = true;
   });
 }
 
@@ -220,13 +273,117 @@ function renderMessage(message, currentUserUid) {
 
   const timeElement = document.createElement("div");
   timeElement.classList.add("message-time");
-  timeElement.textContent = formatTime(message.createdAt);
+  timeElement.textContent = `${message.senderName || "Kullanıcı"} • ${formatTime(message.createdAt)}`;
   messageBubble.appendChild(timeElement);
 
   messageRow.appendChild(messageBubble);
   messagesContainer.appendChild(messageRow);
 
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function handleIncomingMessageNotification(message) {
+  playNotificationSound();
+
+  if (document.visibilityState !== "visible") {
+    unreadMessageCount += 1;
+    updateDocumentTitle();
+  }
+
+  showSystemNotification(message);
+}
+
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) {
+    alert("Bu tarayıcı bildirimleri desteklemiyor.");
+    return;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+
+    if (permission === "granted") {
+      alert("Bildirimler açıldı.");
+      return;
+    }
+
+    if (permission === "denied") {
+      alert("Bildirim izni reddedildi.");
+      return;
+    }
+
+    alert("Bildirim izni verilmedi.");
+  } catch (error) {
+    console.error(error);
+    alert("Bildirim izni alınamadı.");
+  }
+}
+
+function showSystemNotification(message) {
+  if (!("Notification" in window)) {
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
+    return;
+  }
+
+  if (document.visibilityState === "visible") {
+    return;
+  }
+
+  const notificationBody =
+    message.type === "image"
+      ? "Yeni bir fotoğraf gönderildi 📷"
+      : message.text;
+
+  const notification = new Notification("Vichat", {
+    body: `${message.senderName || "Yeni mesaj"}: ${notificationBody}`,
+    tag: "vichat-new-message",
+    renotify: true
+  });
+
+  notification.onclick = function handleNotificationClick() {
+    window.focus();
+    notification.close();
+  };
+}
+
+function playNotificationSound() {
+  try {
+    const audioContext = new AudioContext();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = "triangle";
+    oscillator.frequency.value = 880;
+    gainNode.gain.value = 0.04;
+
+    oscillator.start();
+
+    setTimeout(function stopFirstTone() {
+      oscillator.frequency.value = 660;
+    }, 90);
+
+    setTimeout(function stopSound() {
+      oscillator.stop();
+      audioContext.close();
+    }, 180);
+  } catch (error) {
+    console.log("Bildirim sesi çalınamadı.", error);
+  }
+}
+
+function updateDocumentTitle() {
+  if (unreadMessageCount > 0) {
+    document.title = `(${unreadMessageCount}) Vichat`;
+    return;
+  }
+
+  document.title = "Vichat";
 }
 
 function compressImageToBase64(file) {
@@ -303,7 +460,11 @@ function showLoginPage() {
 function showChatPage(user) {
   loginPage.classList.add("hidden");
   chatPage.classList.remove("hidden");
-  userLabel.textContent = user.email;
+  userLabel.textContent = `${getDisplayNameFromEmail(user.email)} • ${user.email}`;
+}
+
+function getDisplayNameFromEmail(email) {
+  return allowedUsers[email] || email || "Kullanıcı";
 }
 
 function formatTime(timestamp) {
