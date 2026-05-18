@@ -25,13 +25,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
 const firebaseConfig = {
-  apiKey: "BURAYA_FIREBASE_API_KEY_GELECEK",
-  authDomain: "BURAYA_FIREBASE_AUTH_DOMAIN_GELECEK",
-  databaseURL: "BURAYA_FIREBASE_DATABASE_URL_GELECEK",
-  projectId: "BURAYA_FIREBASE_PROJECT_ID_GELECEK",
-  storageBucket: "BURAYA_FIREBASE_STORAGE_BUCKET_GELECEK",
-  messagingSenderId: "BURAYA_FIREBASE_MESSAGING_SENDER_ID_GELECEK",
-  appId: "BURAYA_FIREBASE_APP_ID_GELECEK"
+  apiKey: "AIzaSyCN9hMpHMtMvELr8kBcYDbS7PcgPuOyIgU",
+  authDomain: "vichat-ca7b7.firebaseapp.com",
+  projectId: "vichat-ca7b7",
+  storageBucket: "vichat-ca7b7.firebasestorage.app",
+  messagingSenderId: "875788187635",
+  appId: "1:875788187635:web:fcc778c857eac74ea5c486"
 };
 
 const allowedEmails = new Set([
