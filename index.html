@@ -1,37 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Vichat</title>
+
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <main class="app">
-    <section class="login-panel">
-      <h1>Vichat</h1>
 
-      <form id="login-form">
-        <input id="email" type="email" placeholder="Email" required />
-        <input id="password" type="password" placeholder="Password" required />
-        <button type="submit">Enter</button>
-      </form>
+<body>
+  <main class="app-shell">
+
+    <section id="login-page" class="login-page">
+      <div class="login-card">
+        <div class="brand-circle">Vi</div>
+
+        <h1>Vichat</h1>
+        <p>Sadece ikiniz için küçük, özel bir sohbet alanı.</p>
+
+        <form id="login-form" class="login-form">
+          <input
+            id="email-input"
+            type="email"
+            placeholder="E-posta"
+            autocomplete="email"
+            required
+          />
+
+          <input
+            id="password-input"
+            type="password"
+            placeholder="Şifre"
+            autocomplete="current-password"
+            required
+          />
+
+          <button type="submit">Giriş Yap</button>
+        </form>
+
+        <p id="login-error" class="error-text"></p>
+      </div>
     </section>
 
-    <section class="chat-panel">
-      <header>
-        <h1>Vichat</h1>
-        <button id="logout-button">Logout</button>
+    <section id="chat-page" class="chat-page hidden">
+      <header class="chat-header">
+        <div>
+          <h1>Vichat</h1>
+          <p id="user-label">Bağlanıyor...</p>
+        </div>
+
+        <button id="logout-button" class="secondary-button">Çıkış</button>
       </header>
 
-      <div id="chat-box"></div>
+      <div id="messages-container" class="messages-container"></div>
 
-      <footer>
-        <input id="message-input" type="text" placeholder="Write message..." />
-        <input id="photo-input" type="file" accept="image/*" />
-        <button id="send-button">Send</button>
+      <footer class="message-footer">
+        <label class="photo-button" for="photo-input">📷</label>
+
+        <input
+          id="photo-input"
+          class="hidden-file-input"
+          type="file"
+          accept="image/*"
+        />
+
+        <input
+          id="message-input"
+          type="text"
+          placeholder="Mesaj yaz..."
+          autocomplete="off"
+        />
+
+        <button id="send-button">Gönder</button>
       </footer>
     </section>
+
   </main>
 
   <script type="module" src="app.js"></script>
